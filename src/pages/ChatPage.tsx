@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SendIcon } from "../components/Icons";
 
-interface ThinkingStep {
-  text: string;
-}
-
 interface Attachment {
   id: string;
   name: string;
@@ -16,11 +12,10 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  thinking?: ThinkingStep[];
+  thinking?: string;
   isStreaming?: boolean;
   isThinking?: boolean;
   isThinkingStreaming?: boolean;
-  thinkingDisplayed?: number;
   time: string;
   attachments?: Attachment[];
   bookmarked?: boolean;
@@ -33,22 +28,10 @@ interface ChatSession {
   messages: Message[];
 }
 
-const mockThinkingSteps = [
-  [
-    { text: "分析用户的问题意图…" },
-    { text: "检索相关知识库内容…" },
-    { text: "组织回复结构，确保回答准确且有帮助。" },
-  ],
-  [
-    { text: "理解用户对音乐推荐的需求…" },
-    { text: "考虑下午适合的音乐风格：轻柔、舒缓、有氛围感…" },
-    { text: "筛选曲目，综合考虑旋律和情绪匹配度。" },
-  ],
-  [
-    { text: "收到创作类请求，切换到文学模式…" },
-    { text: "构思秋天的意象：落叶、微风、金色光线…" },
-    { text: "选择简洁的诗歌形式，注重韵律和画面感。" },
-  ],
+const mockThinkingTexts = [
+  "用户在询问今天的天气情况。我需要给出一个合理的天气描述，包括温度、风力和天气状况。考虑到这是一个日常对话场景，我应该用自然亲切的语气回答，同时给出一些实用的建议，比如是否适合出门、需不需要带伞等。让我组织一下回复的结构。",
+  "用户想要一首适合下午听的音乐推荐。下午的时光通常比较悠闲，适合轻柔、舒缓、有氛围感的音乐。我可以推荐一些钢琴曲或者新世纪音乐。Yiruma 的 River Flows in You 是一个很好的选择，旋律优美且不会太吵闹。也可以推荐坂本龍一的作品作为备选。",
+  "这是一个创作类请求，用户希望我写一段关于秋天的短诗。我需要构思秋天的意象：落叶、微风、金色光线、桂花香、大雁南飞。选择简洁的五言或七言形式，注重韵律和画面感，让读者能够感受到秋天的氛围和意境。",
 ];
 
 const mockReplies = [
@@ -129,109 +112,96 @@ function HistoryIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-function StreamingThinking({ steps, onDone }: { steps: ThinkingStep[]; onDone: () => void }) {
-  const [visibleSteps, setVisibleSteps] = useState(0);
-  const [currentText, setCurrentText] = useState("");
-  const stepIndexRef = useRef(0);
-  const charIndexRef = useRef(0);
-
-  useEffect(() => {
-    stepIndexRef.current = 0;
-    charIndexRef.current = 0;
-    setVisibleSteps(0);
-    setCurrentText("");
-
-    const interval = setInterval(() => {
-      const si = stepIndexRef.current;
-      if (si >= steps.length) {
-        clearInterval(interval);
-        onDone();
-        return;
-      }
-      const fullText = steps[si].text;
-      charIndexRef.current++;
-      if (charIndexRef.current >= fullText.length) {
-        setVisibleSteps(si + 1);
-        setCurrentText("");
-        stepIndexRef.current++;
-        charIndexRef.current = 0;
-      } else {
-        setVisibleSteps(si);
-        setCurrentText(fullText.slice(0, charIndexRef.current));
-      }
-    }, 25);
-
-    return () => clearInterval(interval);
-  }, [steps, onDone]);
-
+function ThinkingPill({ isAnimating, onClick }: { isAnimating?: boolean; onClick: () => void }) {
   return (
-    <div className="pl-6 space-y-1">
-      {steps.slice(0, visibleSteps).map((step, i) => (
-        <p key={i} className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
-          {step.text}
-        </p>
-      ))}
-      {visibleSteps < steps.length && currentText && (
-        <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
-          {currentText}
-          <span className="inline-block w-[2px] h-[12px] bg-[var(--color-text-secondary)] ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ThinkingBlock({ steps, expanded, onToggle, streaming, onStreamDone }: {
-  steps: ThinkingStep[];
-  expanded: boolean;
-  onToggle: () => void;
-  streaming?: boolean;
-  onStreamDone?: () => void;
-}) {
-  return (
-    <div className="mb-2">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-2 py-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-      >
-        <ClockIcon size={14} />
-        <span className="text-[13px] font-medium">Thought process</span>
-        <svg
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          className={`transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
-        >
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 py-1.5 px-1 mb-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+    >
+      <ClockIcon size={14} />
+      <span className="text-[13px] font-medium">Thought process</span>
+      {isAnimating ? (
+        <span className="flex gap-[3px] items-center ml-0.5">
+          <span className="w-[3px] h-[3px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_infinite]" />
+          <span className="w-[3px] h-[3px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
+          <span className="w-[3px] h-[3px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
+        </span>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6" />
         </svg>
-      </button>
-      <div className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"}`}>
-        {streaming && onStreamDone ? (
-          <StreamingThinking steps={steps} onDone={onStreamDone} />
-        ) : (
-          <div className="pl-6 space-y-1">
-            {steps.map((step, i) => (
-              <p key={i} className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
-                {step.text}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </button>
   );
 }
 
-function ThinkingAnimation() {
+function ThinkingDrawer({ open, text, isStreaming, onClose }: {
+  open: boolean;
+  text: string;
+  isStreaming?: boolean;
+  onClose: () => void;
+}) {
+  const [displayed, setDisplayed] = useState("");
+  const indexRef = useRef(0);
+  const prevTextRef = useRef("");
+
+  useEffect(() => {
+    if (!isStreaming || !text) {
+      setDisplayed(text);
+      return;
+    }
+    if (text !== prevTextRef.current) {
+      prevTextRef.current = text;
+      indexRef.current = 0;
+      setDisplayed("");
+    }
+    const interval = setInterval(() => {
+      indexRef.current += 2;
+      if (indexRef.current >= text.length) {
+        setDisplayed(text);
+        clearInterval(interval);
+      } else {
+        setDisplayed(text.slice(0, indexRef.current));
+      }
+    }, 20);
+    return () => clearInterval(interval);
+  }, [text, isStreaming]);
+
   return (
-    <div className="flex items-center gap-2 py-1 mb-2">
-      <ClockIcon size={14} />
-      <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">Thinking</span>
-      <span className="flex gap-[3px] items-center">
-        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_infinite]" />
-        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
-        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
-      </span>
-    </div>
+    <>
+      {open && (
+        <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
+      )}
+      <div
+        className={`
+          fixed bottom-0 left-0 right-0 z-50
+          bg-white rounded-t-2xl shadow-2xl
+          transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${open ? "translate-y-0" : "translate-y-full"}
+        `}
+        style={{ maxHeight: "60vh" }}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-black/15" />
+        </div>
+        <div className="flex items-center px-4 pb-3">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/[0.05] transition-colors">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <h3 className="flex-1 text-center text-[15px] font-semibold pr-[34px]">Thought process</h3>
+        </div>
+        <div className="px-5 pb-6 overflow-y-auto" style={{ maxHeight: "calc(60vh - 80px)" }}>
+          <p className="text-[14px] leading-[1.8] text-[var(--color-text-primary)]">
+            {displayed}
+            {isStreaming && displayed.length < text.length && (
+              <span className="inline-block w-[2px] h-[14px] bg-[var(--color-text-primary)] ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
+            )}
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -377,8 +347,7 @@ export default function ChatPage() {
   }]);
   const [activeSessionId, setActiveSessionId] = useState(sessions[0].id);
   const [input, setInput] = useState("");
-  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
-  const [thinkingStreaming, setThinkingStreaming] = useState<Set<string>>(new Set());
+  const [openThinkingId, setOpenThinkingId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -406,22 +375,7 @@ export default function ChatPage() {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isStreaming: false } : m)));
   }, [setMessages]);
 
-  const handleThinkingStreamDone = useCallback((id: string) => {
-    setThinkingStreaming((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-
-  const toggleThinking = (id: string) => {
-    setExpandedThinking((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const openThinkingMsg = openThinkingId ? messages.find((m) => m.id === openThinkingId) : null;
 
   const toggleBookmark = (id: string) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, bookmarked: !m.bookmarked } : m)));
@@ -497,12 +451,10 @@ export default function ChatPage() {
     }, 300);
 
     setTimeout(() => {
-      setExpandedThinking((prev) => new Set(prev).add(thinkingId));
-      setThinkingStreaming((prev) => new Set(prev).add(thinkingId));
       setMessages((prev) =>
         prev.map((m) =>
           m.id === thinkingId
-            ? { ...m, thinking: mockThinkingSteps[idx], isThinking: false, isThinkingStreaming: true, time: formatNow() }
+            ? { ...m, thinking: mockThinkingTexts[idx], isThinking: false, isThinkingStreaming: true, time: formatNow() }
             : m
         )
       );
@@ -576,15 +528,10 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-start">
-                    {msg.isThinking && <ThinkingAnimation />}
-
-                    {!msg.isThinking && msg.thinking && (
-                      <ThinkingBlock
-                        steps={msg.thinking}
-                        expanded={expandedThinking.has(msg.id)}
-                        onToggle={() => toggleThinking(msg.id)}
-                        streaming={thinkingStreaming.has(msg.id)}
-                        onStreamDone={() => handleThinkingStreamDone(msg.id)}
+                    {(msg.isThinking || msg.thinking) && (
+                      <ThinkingPill
+                        isAnimating={msg.isThinking || msg.isThinkingStreaming}
+                        onClick={() => setOpenThinkingId(msg.id)}
                       />
                     )}
 
@@ -657,6 +604,14 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Thinking drawer */}
+      <ThinkingDrawer
+        open={openThinkingId !== null}
+        text={openThinkingMsg?.thinking || ""}
+        isStreaming={openThinkingMsg?.isThinkingStreaming}
+        onClose={() => setOpenThinkingId(null)}
+      />
 
       {/* History sidebar */}
       <ChatHistorySidebar
