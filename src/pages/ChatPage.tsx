@@ -38,36 +38,92 @@ const mockReplies = [
   "秋风起，叶知归。\n一抹斜阳穿林过，\n金黄铺满旧时径。\n雁声远去天际尽，\n唯余桂香入梦轻。",
 ];
 
-function ThinkingBlock({ steps, expanded, onToggle }: {
-  steps: ThinkingStep[];
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+function ClockIcon({ size = 16 }: { size?: number }) {
   return (
-    <div className="mb-2">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1"
-      >
-        <svg
-          width="12" height="12" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          className={`transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-        <SparkleIcon />
-        <span className="font-medium">思考过程</span>
-      </button>
-      <div className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="ml-5 mt-1 pl-3 border-l-2 border-[var(--color-accent)]/20 space-y-1.5">
-          {steps.map((step, i) => (
-            <p key={i} className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-              {step.text}
-            </p>
-          ))}
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function ThinkingPill({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/[0.05] hover:bg-black/[0.08] transition-colors mb-2"
+    >
+      <ClockIcon size={16} />
+      <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">
+        Thought process
+      </span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-secondary)]">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </button>
+  );
+}
+
+function ThinkingDrawer({ steps, onClose }: {
+  steps: ThinkingStep[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl animate-[slideUp_0.3s_ease-out] max-h-[70vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] shrink-0">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-black/[0.06] hover:bg-black/[0.1] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <span className="text-[15px] font-semibold">Thought process</span>
+          <div className="w-8" />
         </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="space-y-4">
+            {steps.map((step, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-black/[0.06] flex items-center justify-center text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                    {i + 1}
+                  </div>
+                </div>
+                <p className="text-sm text-[var(--color-text-primary)] leading-relaxed">
+                  {step.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-10 h-1 rounded-full bg-black/[0.15] mx-auto mb-2 shrink-0" />
       </div>
+    </div>
+  );
+}
+
+function ThinkingAnimation() {
+  return (
+    <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/[0.05] w-fit mb-2">
+      <ClockIcon size={16} />
+      <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">Thinking</span>
+      <span className="flex gap-[3px] items-center">
+        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_infinite]" />
+        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
+        <span className="w-[4px] h-[4px] bg-[var(--color-text-secondary)] rounded-full animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
+      </span>
     </div>
   );
 }
@@ -112,24 +168,10 @@ function StreamingText({ text, onDone }: { text: string; onDone: () => void }) {
   );
 }
 
-function ThinkingAnimation() {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <SparkleIcon />
-      <span className="text-xs text-[var(--color-text-secondary)] font-medium">正在思考</span>
-      <span className="flex gap-1">
-        <span className="w-1 h-1 bg-[var(--color-accent)] rounded-full animate-[bounce_1.2s_ease-in-out_infinite]" />
-        <span className="w-1 h-1 bg-[var(--color-accent)] rounded-full animate-[bounce_1.2s_ease-in-out_0.2s_infinite]" />
-        <span className="w-1 h-1 bg-[var(--color-accent)] rounded-full animate-[bounce_1.2s_ease-in-out_0.4s_infinite]" />
-      </span>
-    </div>
-  );
-}
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
+  const [drawerMsgId, setDrawerMsgId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const replyIndexRef = useRef(0);
 
@@ -143,14 +185,7 @@ export default function ChatPage() {
     );
   }, []);
 
-  const toggleThinking = (id: string) => {
-    setExpandedThinking((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const drawerMsg = drawerMsgId ? messages.find((m) => m.id === drawerMsgId) : null;
 
   const send = () => {
     const text = input.trim();
@@ -180,10 +215,9 @@ export default function ChatPage() {
     }, 300);
 
     setTimeout(() => {
-      const replyId = thinkingId;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === replyId
+          m.id === thinkingId
             ? {
                 ...m,
                 content: mockReplies[idx],
@@ -202,7 +236,7 @@ export default function ChatPage() {
       <div className="flex-1 overflow-y-auto px-4 py-6">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[#e8956e] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[#e8956e] flex items-center justify-center text-white">
               <SparkleIcon />
             </div>
             <p className="text-[var(--color-text-secondary)] text-sm">
@@ -222,7 +256,7 @@ export default function ChatPage() {
                 ) : (
                   <div className="flex justify-start">
                     <div className="max-w-[85%]">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-2">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[#e8956e] flex items-center justify-center shrink-0">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
@@ -236,11 +270,7 @@ export default function ChatPage() {
                       {msg.isThinking && <ThinkingAnimation />}
 
                       {!msg.isThinking && msg.thinking && (
-                        <ThinkingBlock
-                          steps={msg.thinking}
-                          expanded={expandedThinking.has(msg.id)}
-                          onToggle={() => toggleThinking(msg.id)}
-                        />
+                        <ThinkingPill onClick={() => setDrawerMsgId(msg.id)} />
                       )}
 
                       {!msg.isThinking && msg.content && (
@@ -283,6 +313,13 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {drawerMsg?.thinking && (
+        <ThinkingDrawer
+          steps={drawerMsg.thinking}
+          onClose={() => setDrawerMsgId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -35,3 +35,8 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
