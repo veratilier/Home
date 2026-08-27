@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 interface Track {
   id: string;
@@ -11,14 +11,14 @@ interface Track {
 }
 
 const mockPlaylist: Track[] = [
-  { id: "1", title: "夜的钢琴曲", artist: "石进", album: "夜的钢琴曲", duration: 272, cover: "" },
-  { id: "2", title: "River Flows in You", artist: "Yiruma", album: "First Love", duration: 238, cover: "" },
-  { id: "3", title: "Clair de Lune", artist: "Debussy", album: "Suite bergamasque", duration: 312, cover: "" },
-  { id: "4", title: "Comptine d'un autre été", artist: "Yann Tiersen", album: "Amélie OST", duration: 140, cover: "" },
-  { id: "5", title: "A Thousand Years", artist: "Christina Perri", album: "The Twilight Saga", duration: 285, cover: "" },
-  { id: "6", title: "春泥", artist: "庾澄庆", album: "哈林天堂", duration: 267, cover: "" },
-  { id: "7", title: "晴天", artist: "周杰伦", album: "叶惠美", duration: 269, cover: "" },
-  { id: "8", title: "起风了", artist: "买辣椒也用券", album: "起风了", duration: 325, cover: "" },
+  { id: "1", title: "夜的钢琴曲", artist: "石进", album: "夜的钢琴曲", duration: 272, cover: generateMockCover("1") },
+  { id: "2", title: "River Flows in You", artist: "Yiruma", album: "First Love", duration: 238, cover: generateMockCover("2") },
+  { id: "3", title: "Clair de Lune", artist: "Debussy", album: "Suite bergamasque", duration: 312, cover: generateMockCover("3") },
+  { id: "4", title: "Comptine d'un autre été", artist: "Yann Tiersen", album: "Amélie OST", duration: 140, cover: generateMockCover("4") },
+  { id: "5", title: "A Thousand Years", artist: "Christina Perri", album: "The Twilight Saga", duration: 285, cover: generateMockCover("5") },
+  { id: "6", title: "春泥", artist: "庾澄庆", album: "哈林天堂", duration: 267, cover: generateMockCover("6") },
+  { id: "7", title: "晴天", artist: "周杰伦", album: "叶惠美", duration: 269, cover: generateMockCover("7") },
+  { id: "8", title: "起风了", artist: "买辣椒也用券", album: "起风了", duration: 325, cover: generateMockCover("8") },
 ];
 
 function formatTime(s: number) {
@@ -46,6 +46,58 @@ function generateBgGradient(id: string) {
   return `linear-gradient(180deg, hsl(${h}, 25%, 18%) 0%, hsl(${h}, 30%, 10%) 100%)`;
 }
 
+function generateMockCover(id: string): string {
+  const palettes: Record<string, [string, string, string, string]> = {
+    "1": ["#0d1b40", "#1a3175", "#2e4ea0", "#6b88cc"],
+    "2": ["#0a2830", "#145060", "#1e8090", "#4eb8c8"],
+    "3": ["#1a0835", "#2d1260", "#4a2090", "#7e50c8"],
+    "4": ["#3d2800", "#6e4a00", "#a07000", "#d4a830"],
+    "5": ["#350818", "#601228", "#901a40", "#c83a68"],
+    "6": ["#082818", "#124e2e", "#1a7a48", "#30b068"],
+    "7": ["#081830", "#102858", "#184088", "#2868b8"],
+    "8": ["#381008", "#601810", "#902818", "#c84828"],
+  };
+  const p = palettes[id] || palettes["1"];
+  return `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><defs><radialGradient id="g" cx="30%" cy="30%"><stop offset="0%" stop-color="${p[2]}"/><stop offset="100%" stop-color="${p[0]}"/></radialGradient></defs><rect width="400" height="400" fill="url(#g)"/><circle cx="300" cy="320" r="180" fill="${p[1]}" opacity=".4"/><circle cx="100" cy="80" r="120" fill="${p[3]}" opacity=".2"/><circle cx="200" cy="200" r="60" fill="${p[3]}" opacity=".15"/></svg>`
+  )}`;
+}
+
+function extractDominantColors(imgSrc: string): Promise<[number, number, number, number, number, number] | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const sz = 64;
+      canvas.width = sz;
+      canvas.height = sz;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) { resolve(null); return; }
+      ctx.drawImage(img, 0, 0, sz, sz);
+      const data = ctx.getImageData(0, 0, sz, sz).data;
+      let r1 = 0, g1 = 0, b1 = 0, r2 = 0, g2 = 0, b2 = 0;
+      let n1 = 0, n2 = 0;
+      for (let i = 0; i < data.length; i += 16) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        if (data[i + 3] < 128) continue;
+        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+        if (lum < 128) { r1 += r; g1 += g; b1 += b; n1++; }
+        else { r2 += r; g2 += g; b2 += b; n2++; }
+      }
+      if (n1 === 0 && n2 === 0) { resolve(null); return; }
+      if (n1 === 0) { n1 = 1; r1 = r2 / n2; g1 = g2 / n2; b1 = b2 / n2; }
+      if (n2 === 0) { n2 = n1; r2 = r1; g2 = g1; b2 = b1; }
+      resolve([
+        Math.round(r1 / n1), Math.round(g1 / n1), Math.round(b1 / n1),
+        Math.round(r2 / n2), Math.round(g2 / n2), Math.round(b2 / n2),
+      ]);
+    };
+    img.onerror = () => resolve(null);
+    img.src = imgSrc;
+  });
+}
+
 export default function MusicPage() {
   const [playlist] = useState<Track[]>(mockPlaylist);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -59,12 +111,21 @@ export default function MusicPage() {
     try { return new Set(JSON.parse(localStorage.getItem("music_liked") || "[]")); }
     catch { return new Set(); }
   });
+  const [coverColors, setCoverColors] = useState<[number, number, number, number, number, number] | null>(null);
   const progressRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
   const current = playlist[currentIndex];
   if (!current) return null;
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!current.cover) { setCoverColors(null); return; }
+    let cancelled = false;
+    extractDominantColors(current.cover).then((c) => { if (!cancelled) setCoverColors(c); });
+    return () => { cancelled = true; };
+  }, [current.cover, current.id]);
 
   const toggleLike = (id: string) => {
     setLikedIds((prev) => {
@@ -128,11 +189,20 @@ export default function MusicPage() {
     setRepeatMode((m) => m === "off" ? "all" : m === "all" ? "one" : "off");
   };
 
-  const bgGradient = generateBgGradient(current.id);
+  const bgGradient = useMemo(() => {
+    if (coverColors) {
+      const [r1, g1, b1, r2, g2, b2] = coverColors;
+      const d = (r: number, g: number, b: number, f: number) =>
+        `${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)}`;
+      return `linear-gradient(180deg, rgb(${d(r1, g1, b1, 0.45)}) 0%, rgb(${d(r2, g2, b2, 0.2)}) 50%, rgb(${d(r1, g1, b1, 0.15)}) 100%)`;
+    }
+    return generateBgGradient(current.id);
+  }, [coverColors, current.id]);
+
   const coverGradient = generateCoverGradient(current.id);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden text-white/90" style={{ background: bgGradient }}>
+    <div className="flex flex-col h-full overflow-hidden text-white/90" style={{ background: bgGradient, transition: "background 0.8s ease" }}>
       {/* Top bar */}
       <div className="shrink-0 flex items-center justify-between px-5 py-4">
         <button onClick={() => setSearchOpen(true)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
@@ -165,28 +235,47 @@ export default function MusicPage() {
         <p className="text-[11px] text-white/40 mt-2">一起听了 671 小时 48 分钟</p>
       </div>
 
-      {/* Album art */}
+      {/* Album art disc */}
       <div className="flex-1 flex items-center justify-center px-8 min-h-0">
         <div className="relative w-full max-w-[300px] aspect-square">
-          {/* Glow ring */}
+          {/* Glow */}
           <div
             className="absolute inset-[-12px] rounded-full opacity-40 blur-md"
-            style={{ background: `radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)` }}
+            style={{
+              background: coverColors
+                ? `radial-gradient(circle, rgba(${coverColors[0]},${coverColors[1]},${coverColors[2]},0.35) 0%, transparent 70%)`
+                : "radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)",
+              transition: "background 0.8s ease",
+            }}
           />
           {/* Disc */}
           <div
-            className={`w-full h-full rounded-full flex items-center justify-center shadow-2xl ${isPlaying ? "animate-[spin_20s_linear_infinite]" : ""}`}
-            style={{ background: coverGradient }}
+            className={`w-full h-full rounded-full relative overflow-hidden shadow-2xl ${isPlaying ? "animate-[spin_20s_linear_infinite]" : ""}`}
+            style={!current.cover ? { background: coverGradient } : undefined}
           >
-            {/* Inner ring */}
-            <div className="w-[38%] h-[38%] rounded-full bg-black/40 border border-white/10 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-white/20" />
-            </div>
-            {/* Track initial */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-[42px] font-bold text-white/10 select-none" style={{ marginTop: "-12%", marginLeft: "20%" }}>
-                {current.title.charAt(0)}
-              </span>
+            {current.cover ? (
+              <img
+                src={current.cover}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover select-none"
+                draggable={false}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-[42px] font-bold text-white/10 select-none" style={{ marginTop: "-12%", marginLeft: "20%" }}>
+                  {current.title.charAt(0)}
+                </span>
+              </div>
+            )}
+            {/* Vinyl grooves overlay */}
+            <div className="absolute inset-0 rounded-full" style={{
+              background: "repeating-radial-gradient(circle at center, transparent 0px, transparent 4px, rgba(0,0,0,0.06) 4px, rgba(0,0,0,0.06) 5px)",
+            }} />
+            {/* Center hole */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-[28%] h-[28%] rounded-full bg-black/50 border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                <div className="w-3 h-3 rounded-full bg-white/20" />
+              </div>
             </div>
           </div>
         </div>
@@ -322,20 +411,21 @@ export default function MusicPage() {
                   onClick={() => { setCurrentIndex(i); setPlaylistOpen(false); setIsPlaying(true); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${i === currentIndex ? "bg-white/10" : "hover:bg-white/5"}`}
                 >
-                  <span className="w-5 text-center text-[11px] tabular-nums text-white/30">
-                    {i === currentIndex ? (
-                      <span className="text-[var(--color-accent)]">
-                        {isPlaying ? "♫" : "▶"}
-                      </span>
+                  <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/5">
+                    {track.cover ? (
+                      <img src={track.cover} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      i + 1
+                      <div className="w-full h-full flex items-center justify-center text-[11px] text-white/30">{i + 1}</div>
                     )}
-                  </span>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-[13px] truncate ${i === currentIndex ? "text-[var(--color-accent)] font-medium" : "text-white/80"}`}>{track.title}</p>
                     <p className="text-[11px] text-white/35 truncate">{track.artist}</p>
                   </div>
-                  <span className="text-[11px] text-white/25 tabular-nums">{formatTime(track.duration)}</span>
+                  {i === currentIndex && (
+                    <span className="text-[var(--color-accent)] text-[12px] shrink-0">{isPlaying ? "♫" : "▶"}</span>
+                  )}
+                  <span className="text-[11px] text-white/25 tabular-nums shrink-0">{formatTime(track.duration)}</span>
                 </button>
               ))}
             </div>
