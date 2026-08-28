@@ -1,48 +1,33 @@
 import { useRef, useEffect, useState } from "react";
 
-const SCALE = 4;
-const W = 20;
-const H = 16;
+const SCALE = 5;
+const W = 15;
+const H = 12;
 
-const PALETTE: Record<number, string> = {
-  1: "#c96442",
-  2: "#a34f33",
-  3: "#1a1a1a",
-  4: "#e8956e",
-};
+const BODY = "#DE886D";
+const EYES = "#000000";
 
 const IDLE: number[][] = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
-  [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
-  [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
-  [0,0,0,1,1,1,3,3,1,1,1,1,3,3,1,1,1,0,0,0],
-  [0,0,0,1,1,1,3,3,1,1,1,1,3,3,1,1,1,0,0,0],
-  [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
-  [2,2,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,2,2],
-  [0,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,0],
-  [2,2,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,2,2],
-  [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
-  [0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0],
-  [0,0,0,0,0,2,2,0,0,0,0,0,0,2,2,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+  [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+  [0,0,1,1,2,1,1,1,1,1,2,1,1,0,0],
+  [1,1,1,1,2,1,1,1,1,1,2,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+  [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+  [0,0,0,1,0,1,0,0,0,1,0,1,0,0,0],
+  [0,0,0,1,0,1,0,0,0,1,0,1,0,0,0],
+  [0,0,0,3,3,3,3,3,3,3,3,3,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
 type PetState = "idle" | "blink" | "happy";
 
 function getFrame(state: PetState): number[][] {
-  if (state === "idle") return IDLE;
+  if (state === "idle" || state === "happy") return IDLE;
   const f = IDLE.map((row) => [...row]);
-  if (state === "blink") {
-    f[4] = [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0];
-    f[5] = [0,0,0,1,1,1,2,2,1,1,1,1,2,2,1,1,1,0,0,0];
-  } else {
-    f[4] = [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0];
-    f[5] = [0,0,0,1,1,1,2,2,1,1,1,1,2,2,1,1,1,0,0,0];
-    f[6] = [0,0,0,1,4,4,1,1,2,2,2,2,1,1,4,4,1,0,0,0];
-  }
+  f[3] = [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0];
   return f;
 }
 
@@ -56,10 +41,17 @@ function drawFrame(canvas: HTMLCanvasElement | null, state: PetState) {
     for (let x = 0; x < frame[y].length; x++) {
       const c = frame[y][x];
       if (!c) continue;
-      ctx.fillStyle = PALETTE[c];
+      if (c === 3) {
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = EYES;
+      } else {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = c === 1 ? BODY : EYES;
+      }
       ctx.fillRect(x, y, 1, 1);
     }
   }
+  ctx.globalAlpha = 1;
 }
 
 export default function DesktopPet() {
@@ -91,7 +83,7 @@ export default function DesktopPet() {
     setJumping(true);
     setHearts((prev) => [
       ...prev,
-      { id: Date.now(), x: 30 + Math.random() * 40 },
+      { id: Date.now(), x: 25 + Math.random() * 50 },
     ]);
     setTimeout(() => setJumping(false), 500);
     setTimeout(() => setPetState("idle"), 900);
@@ -108,7 +100,7 @@ export default function DesktopPet() {
           className="absolute -top-1 pointer-events-none"
           style={{
             left: `${h.x}%`,
-            color: "var(--color-accent)",
+            color: BODY,
             fontSize: 16,
             animation: "heartFloat 0.8s ease-out forwards",
           }}
@@ -119,16 +111,6 @@ export default function DesktopPet() {
           ♥
         </span>
       ))}
-
-      <div
-        className="absolute bottom-0 left-1/2 rounded-full bg-black/10"
-        style={{
-          width: 56,
-          height: 6,
-          transform: `translateX(-50%) scaleX(${jumping ? 0.6 : 1})`,
-          transition: "transform 0.25s",
-        }}
-      />
 
       <div
         style={{
