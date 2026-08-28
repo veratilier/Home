@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { loadSettings } from "../pages/SettingsPage";
 
 const DEFAULT_SCALE = 5;
@@ -55,6 +55,18 @@ function drawFrame(canvas: HTMLCanvasElement | null, state: PetState) {
   ctx.globalAlpha = 1;
 }
 
+function loadPosition(): { x: number; y: number } | null {
+  try {
+    const raw = localStorage.getItem("pet_position");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function savePosition(x: number, y: number) {
+  try { localStorage.setItem("pet_position", JSON.stringify({ x, y })); } catch {}
+}
+
 export default function DesktopPet() {
   const settings = loadSettings();
   const scale = settings.petScale || DEFAULT_SCALE;
@@ -65,7 +77,25 @@ export default function DesktopPet() {
   const stateRef = useRef(petState);
   stateRef.current = petState;
 
+  const petW = W * scale;
+  const petH = H * scale;
+
+  const saved = loadPosition();
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    if (saved) return saved;
+    return { x: window.innerWidth - petW - 16, y: window.innerHeight - petH - 16 };
+  });
+
+  const dragging = useRef(false);
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const hasMoved = useRef(false);
+
   if (!settings.petVisible) return null;
+
+  const clamp = useCallback((x: number, y: number) => ({
+    x: Math.max(0, Math.min(window.innerWidth - petW, x)),
+    y: Math.max(0, Math.min(window.innerHeight - petH, y)),
+  }), [petW, petH]);
 
   useEffect(() => {
     drawFrame(canvasRef.current, petState);
@@ -83,7 +113,66 @@ export default function DesktopPet() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const onMove = (cx: number, cy: number) => {
+      if (!dragging.current) return;
+      const dx = cx - dragStart.current.mx;
+      const dy = cy - dragStart.current.my;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true;
+      const next = clamp(dragStart.current.px + dx, dragStart.current.py + dy);
+      setPos(next);
+    };
+
+    const onEnd = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      setPos((p) => { savePosition(p.x, p.y); return p; });
+      document.body.style.userSelect = "";
+    };
+
+    const handleMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+    const handleMouseUp = () => onEnd();
+    const handleTouchEnd = () => onEnd();
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [clamp]);
+
+  const startDrag = (cx: number, cy: number) => {
+    dragging.current = true;
+    hasMoved.current = false;
+    dragStart.current = { mx: cx, my: cy, px: pos.x, py: pos.y };
+    document.body.style.userSelect = "none";
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    startDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
   const handleClick = () => {
+    if (hasMoved.current) return;
     setPetState("happy");
     setJumping(true);
     setHearts((prev) => [
@@ -96,7 +185,10 @@ export default function DesktopPet() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-30 select-none cursor-pointer"
+      className="fixed z-30 select-none cursor-grab active:cursor-grabbing"
+      style={{ left: pos.x, top: pos.y }}
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       onClick={handleClick}
     >
       {hearts.map((h) => (
@@ -121,7 +213,7 @@ export default function DesktopPet() {
         style={{
           animation: jumping
             ? "petJump 0.5s ease-out"
-            : "petBob 2s ease-in-out infinite",
+            : dragging.current ? "none" : "petBob 2s ease-in-out infinite",
         }}
       >
         <canvas
@@ -129,8 +221,8 @@ export default function DesktopPet() {
           width={W}
           height={H}
           style={{
-            width: W * scale,
-            height: H * scale,
+            width: petW,
+            height: petH,
             imageRendering: "pixelated",
           }}
         />

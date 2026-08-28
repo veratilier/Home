@@ -36,6 +36,8 @@ export interface AppSettings {
   language: string;
   petVisible: boolean;
   petScale: number;
+  backgroundImage: string;
+  backgroundOpacity: number;
 }
 
 const DEFAULTS: AppSettings = {
@@ -65,6 +67,8 @@ const DEFAULTS: AppSettings = {
   language: "zh-CN",
   petVisible: true,
   petScale: 5,
+  backgroundImage: "",
+  backgroundOpacity: 0.3,
 };
 
 export function loadSettings(): AppSettings {
@@ -681,6 +685,64 @@ function NotifyView({ s, set, goBack }: SubViewProps) {
   );
 }
 
+function BackgroundUpload({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("图片不能超过 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      onChange(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="py-4">
+      {value ? (
+        <div className="space-y-3">
+          <div className="relative w-full h-32 rounded-xl overflow-hidden border border-[var(--color-border)]">
+            <img src={value} alt="Background" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex-1 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] hover:bg-black/[0.03] transition-colors"
+            >
+              更换
+            </button>
+            <button
+              onClick={() => onChange("")}
+              className="flex-1 py-2 rounded-xl text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+            >
+              移除
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="w-full py-6 rounded-xl border-2 border-dashed border-[var(--color-border)] hover:border-[var(--color-accent)] transition-colors flex flex-col items-center gap-2"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-secondary)] opacity-50">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          <span className="text-sm text-[var(--color-text-secondary)]">上传背景图片</span>
+          <span className="text-xs text-[var(--color-text-secondary)] opacity-60">支持 JPG、PNG，不超过 5MB</span>
+        </button>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
 function AppearanceView({ s, set, goBack }: SubViewProps) {
   return (
     <>
@@ -757,6 +819,16 @@ function AppearanceView({ s, set, goBack }: SubViewProps) {
             <option value="ja">日本語</option>
           </select>
         </Row>
+      </SectionCard>
+
+      <div className="text-sm font-medium mb-3 mt-6">背景图片</div>
+      <SectionCard>
+        <BackgroundUpload value={s.backgroundImage} onChange={(v) => set("backgroundImage", v)} />
+        {s.backgroundImage && (
+          <Row label="背景透明度" desc={`${Math.round(s.backgroundOpacity * 100)}%`}>
+            <input type="range" min="0.1" max="0.8" step="0.05" value={s.backgroundOpacity} onChange={(e) => set("backgroundOpacity", parseFloat(e.target.value))} className="w-32 accent-[var(--color-accent)]" />
+          </Row>
+        )}
       </SectionCard>
     </>
   );

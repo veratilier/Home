@@ -125,6 +125,8 @@ export default function MusicPage() {
   const [mcpSettingsOpen, setMcpSettingsOpen] = useState(false);
   const [mcpUrl, setMcpUrl] = useState(() => localStorage.getItem("music_mcp_url") || "");
   const [mcpCookie, setMcpCookie] = useState(() => localStorage.getItem("music_mcp_cookie") || "");
+  const [mcpAuthMode, setMcpAuthMode] = useState<"cookie" | "oauth">(() => (localStorage.getItem("music_mcp_auth_mode") as "cookie" | "oauth") || "cookie");
+  const [mcpOAuthUrl, setMcpOAuthUrl] = useState(() => localStorage.getItem("music_mcp_oauth_url") || "");
   const progressRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -590,20 +592,79 @@ export default function MusicPage() {
                 />
               </div>
 
-              {/* Cookie */}
-              <div className="mb-5">
-                <label className="text-[11px] text-white/40 mb-1.5 block">Cookie / 登录凭证</label>
-                <textarea
-                  value={mcpCookie}
-                  onChange={(e) => {
-                    setMcpCookie(e.target.value);
-                    try { localStorage.setItem("music_mcp_cookie", e.target.value); } catch {}
-                  }}
-                  placeholder="MUSIC_U=..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 text-[13px] text-white/80 rounded-xl bg-white/8 border border-white/10 outline-none focus:border-white/25 transition-colors placeholder:text-white/20 resize-none"
-                />
+              {/* Auth mode toggle */}
+              <div className="mb-4">
+                <label className="text-[11px] text-white/40 mb-1.5 block">认证方式</label>
+                <div className="flex gap-2">
+                  {([
+                    { value: "cookie" as const, label: "Cookie", icon: "🔑" },
+                    { value: "oauth" as const, label: "OAuth", icon: "🔐" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setMcpAuthMode(opt.value);
+                        try { localStorage.setItem("music_mcp_auth_mode", opt.value); } catch {}
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all border"
+                      style={{
+                        borderColor: mcpAuthMode === opt.value ? "var(--color-accent)" : "rgba(255,255,255,0.1)",
+                        background: mcpAuthMode === opt.value ? "var(--color-accent)" : "rgba(255,255,255,0.05)",
+                        color: mcpAuthMode === opt.value ? "#fff" : "rgba(255,255,255,0.6)",
+                      }}
+                    >
+                      <span>{opt.icon}</span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {mcpAuthMode === "cookie" ? (
+                <div className="mb-5">
+                  <label className="text-[11px] text-white/40 mb-1.5 block">Cookie / 登录凭证</label>
+                  <textarea
+                    value={mcpCookie}
+                    onChange={(e) => {
+                      setMcpCookie(e.target.value);
+                      try { localStorage.setItem("music_mcp_cookie", e.target.value); } catch {}
+                    }}
+                    placeholder="MUSIC_U=..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 text-[13px] text-white/80 rounded-xl bg-white/8 border border-white/10 outline-none focus:border-white/25 transition-colors placeholder:text-white/20 resize-none"
+                  />
+                </div>
+              ) : (
+                <div className="mb-5">
+                  <label className="text-[11px] text-white/40 mb-1.5 block">OAuth 授权地址</label>
+                  <input
+                    value={mcpOAuthUrl}
+                    onChange={(e) => {
+                      setMcpOAuthUrl(e.target.value);
+                      try { localStorage.setItem("music_mcp_oauth_url", e.target.value); } catch {}
+                    }}
+                    placeholder="https://music.example.com/oauth/authorize"
+                    className="w-full px-3 py-2.5 text-[13px] text-white/80 rounded-xl bg-white/8 border border-white/10 outline-none focus:border-white/25 transition-colors placeholder:text-white/20 mb-3"
+                  />
+                  <button
+                    onClick={() => {
+                      const url = mcpOAuthUrl.trim();
+                      if (url) window.open(url, "_blank", "noopener,noreferrer");
+                    }}
+                    disabled={!mcpOAuthUrl.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.85)" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                    前往授权
+                  </button>
+                  <p className="text-[10px] text-white/25 mt-2 text-center">点击后将跳转至第三方授权页面完成登录</p>
+                </div>
+              )}
 
               {/* Actions */}
               <button

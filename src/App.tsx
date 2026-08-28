@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import { MenuIcon } from "./components/Icons";
@@ -9,20 +9,40 @@ import MusicPage from "./pages/MusicPage";
 import DiaryPage from "./pages/DiaryPage";
 import NotesPage from "./pages/NotesPage";
 import AnniversaryPage from "./pages/AnniversaryPage";
-import SettingsPage from "./pages/SettingsPage";
+import SettingsPage, { loadSettings } from "./pages/SettingsPage";
 import DesktopPet from "./components/DesktopPet";
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const [bgImage, setBgImage] = useState("");
+  const [bgOpacity, setBgOpacity] = useState(0.3);
+
+  useEffect(() => {
+    const sync = () => {
+      const s = loadSettings();
+      setBgImage(s.backgroundImage);
+      setBgOpacity(s.backgroundOpacity);
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    const id = setInterval(sync, 2000);
+    return () => { window.removeEventListener("storage", sync); clearInterval(id); };
+  }, []);
 
   return (
     <AgentProvider navigate={navigate}>
-      <div className="flex h-full">
+      <div className="flex h-full relative">
+        {bgImage && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img src={bgImage} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ background: `rgba(249,249,248,${1 - bgOpacity})` }} />
+          </div>
+        )}
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <DesktopPet />
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
           <header className="flex items-center h-[56px] px-4 shrink-0 lg:hidden">
             <button
               onClick={() => setSidebarOpen(true)}
