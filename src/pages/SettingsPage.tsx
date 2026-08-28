@@ -153,10 +153,9 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MenuItem({ icon, label, desc, onClick }: { icon: string; label: string; desc?: string; onClick: () => void }) {
+function MenuItem({ label, desc, onClick }: { label: string; desc?: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex items-center gap-3.5 w-full py-3.5 text-left border-b border-[var(--color-border)] last:border-b-0 hover:opacity-80 transition-opacity">
-      <span className="text-lg w-7 text-center shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="text-sm">{label}</div>
         {desc && <div className="text-xs text-[var(--color-text-secondary)] mt-0.5 truncate">{desc}</div>}
@@ -339,8 +338,8 @@ function AIView({ s, set, goBack }: SubViewProps) {
               <div className="text-sm mb-3">订阅服务</div>
               <div className="space-y-2">
                 {[
-                  { value: "claude" as const, label: "Claude", desc: "Anthropic Claude 系列模型", icon: "🤖" },
-                  { value: "chatgpt" as const, label: "ChatGPT", desc: "OpenAI GPT 系列模型", icon: "💬" },
+                  { value: "claude" as const, label: "Claude", desc: "Anthropic Claude 系列模型" },
+                  { value: "chatgpt" as const, label: "ChatGPT", desc: "OpenAI GPT 系列模型" },
                 ].map((opt) => (
                   <button
                     key={opt.value}
@@ -351,7 +350,6 @@ function AIView({ s, set, goBack }: SubViewProps) {
                       background: s.subscriptionProvider === opt.value ? "var(--color-accent)" + "0d" : "transparent",
                     }}
                   >
-                    <span className="text-xl">{opt.icon}</span>
                     <div className="text-left">
                       <div className="text-sm font-medium">{opt.label}</div>
                       <div className="text-xs text-[var(--color-text-secondary)]">{opt.desc}</div>
@@ -367,7 +365,6 @@ function AIView({ s, set, goBack }: SubViewProps) {
             </div>
             <div className="py-3.5 pb-4">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                <span className="text-sm">⚠️</span>
                 <p className="text-xs text-amber-700">订阅模式需要配置后端服务器，目前为演示界面。</p>
               </div>
             </div>
@@ -489,7 +486,6 @@ function McpView({ s, set, goBack }: SubViewProps) {
 
       {s.mcpServers.length === 0 && (
         <div className="py-8 text-center">
-          <div className="text-3xl mb-2">🔌</div>
           <p className="text-sm text-[var(--color-text-secondary)]">尚未添加 MCP 服务器</p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">添加服务器以扩展 AI 的工具能力</p>
         </div>
@@ -678,7 +674,7 @@ function NotifyView({ s, set, goBack }: SubViewProps) {
 
       <div className="mt-4 px-1">
         <p className="text-xs text-[var(--color-text-secondary)]">
-          💡 如果以 PWA 或原生 App 方式使用，请确保在系统设置中也允许了 Vesper 的通知权限。
+          如果以 PWA 或原生 App 方式使用，请确保在系统设置中也允许了 Vesper 的通知权限。
         </p>
       </div>
     </>
@@ -694,20 +690,19 @@ function AppearanceView({ s, set, goBack }: SubViewProps) {
       <div className="text-sm font-medium mb-3">主题</div>
       <div className="flex gap-2 mb-6">
         {[
-          { value: "light", label: "浅色", icon: "☀️" },
-          { value: "dark", label: "深色", icon: "🌙" },
-          { value: "system", label: "跟随系统", icon: "💻" },
+          { value: "light", label: "浅色" },
+          { value: "dark", label: "深色" },
+          { value: "system", label: "跟随系统" },
         ].map((opt) => (
           <button
             key={opt.value}
             onClick={() => set("theme", opt.value)}
-            className="flex-1 py-3 rounded-2xl text-sm font-medium transition-all border-2 flex flex-col items-center gap-1"
+            className="flex-1 py-3 rounded-2xl text-sm font-medium transition-all border-2"
             style={{
               borderColor: s.theme === opt.value ? "var(--color-accent)" : "var(--color-border)",
               background: s.theme === opt.value ? "var(--color-accent)" + "0d" : "transparent",
             }}
           >
-            <span className="text-lg">{opt.icon}</span>
             {opt.label}
           </button>
         ))}
@@ -943,24 +938,24 @@ export default function SettingsPage() {
 
       <div className="space-y-4">
         <SectionCard>
-          <MenuItem icon="👤" label="个人资料" desc={`${s.userName} / ${s.assistantName}`} onClick={() => setView("profile")} />
-          <MenuItem icon="🤖" label="AI 接入" desc={aiDesc} onClick={() => setView("ai")} />
-          <MenuItem icon="🔌" label="MCP 工具" desc={`${s.mcpServers.length} 个服务器`} onClick={() => setView("mcp")} />
+          <MenuItem label="个人资料" desc={`${s.userName} / ${s.assistantName}`} onClick={() => setView("profile")} />
+          <MenuItem label="AI 接入" desc={aiDesc} onClick={() => setView("ai")} />
+          <MenuItem label="MCP 工具" desc={`${s.mcpServers.length} 个服务器`} onClick={() => setView("mcp")} />
         </SectionCard>
 
         <SectionCard>
-          <MenuItem icon="🎙️" label="语音设置" desc={voiceDesc} onClick={() => setView("voice")} />
-          <MenuItem icon="🔔" label="通知推送" desc={`${notifyCount} 项已开启`} onClick={() => setView("notify")} />
+          <MenuItem label="语音设置" desc={voiceDesc} onClick={() => setView("voice")} />
+          <MenuItem label="通知推送" desc={`${notifyCount} 项已开启`} onClick={() => setView("notify")} />
         </SectionCard>
 
         <SectionCard>
-          <MenuItem icon="🎨" label="外观与主题" desc={s.theme === "dark" ? "深色" : s.theme === "system" ? "跟随系统" : "浅色"} onClick={() => setView("appearance")} />
-          <MenuItem icon="🐾" label="桌宠" desc={s.petVisible ? `已开启 · ${s.petScale}x` : "已关闭"} onClick={() => setView("pet")} />
+          <MenuItem label="外观与主题" desc={s.theme === "dark" ? "深色" : s.theme === "system" ? "跟随系统" : "浅色"} onClick={() => setView("appearance")} />
+          <MenuItem label="桌宠" desc={s.petVisible ? `已开启 · ${s.petScale}x` : "已关闭"} onClick={() => setView("pet")} />
         </SectionCard>
 
         <SectionCard>
-          <MenuItem icon="💾" label="数据管理" desc="导出、导入、清除" onClick={() => setView("data")} />
-          <MenuItem icon="ℹ️" label="关于" desc="v0.1.0" onClick={() => setView("about")} />
+          <MenuItem label="数据管理" desc="导出、导入、清除" onClick={() => setView("data")} />
+          <MenuItem label="关于" desc="v0.1.0" onClick={() => setView("about")} />
         </SectionCard>
       </div>
     </div>
