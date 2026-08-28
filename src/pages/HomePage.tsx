@@ -1,12 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadSettings } from "./SettingsPage";
-
-interface Note {
-  id: string;
-  text: string;
-  createdAt: number;
-}
 
 interface Reminder {
   id: string;
@@ -33,7 +27,38 @@ interface NowPlaying {
   isPlaying: boolean;
 }
 
+interface StickyNote {
+  id: string;
+  text: string;
+  color: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface WeatherData {
+  temperature: number;
+  weathercode: number;
+}
+
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+const NOTE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  yellow: { bg: "#fef9c3", border: "#f5e6a3", text: "#78660a" },
+  green: { bg: "#dcfce7", border: "#b8e6c8", text: "#14532d" },
+  blue: { bg: "#dbeafe", border: "#b5cff0", text: "#1e3a5f" },
+  pink: { bg: "#fce7f3", border: "#f0c6dd", text: "#831843" },
+  orange: { bg: "#ffedd5", border: "#f0d4b0", text: "#7c2d12" },
+  purple: { bg: "#f3e8ff", border: "#dcc8f0", text: "#581c87" },
+};
+
+function weatherIcon(code: number): string {
+  if (code === 0) return "sun";
+  if (code <= 3) return "cloud";
+  if (code <= 48) return "fog";
+  if (code <= 67 || (code >= 80 && code <= 82)) return "rain";
+  if (code <= 77 || (code >= 85 && code <= 86)) return "snow";
+  return "storm";
+}
 
 function getAnniversaryDays(item: Anniversary): { days: number; prefix: string } {
   const now = new Date();
@@ -56,15 +81,70 @@ export default function HomePage() {
   const settings = loadSettings();
   const navigate = useNavigate();
   const [now, setNow] = useState(new Date());
-  const [notes, setNotes] = useState<Note[]>(() => {
-    try { return JSON.parse(localStorage.getItem("home_notes") || "[]"); }
-    catch { return []; }
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(() => {
+    try {
+      const d = localStorage.getItem("music_now_playing");
+      return d ? JSON.parse(d) : null;
+    } catch { return null; }
   });
-  const [noteInput, setNoteInput] = useState("");
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
+  }, []);
+
+  // Real-time music sync via storage events + polling
+  const syncMusic = useCallback(() => {
+    try {
+      const d = localStorage.getItem("music_now_playing");
+      setNowPlaying(d ? JSON.parse(d) : null);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "music_now_playing") syncMusic();
+    };
+    window.addEventListener("storage", onStorage);
+    const poll = setInterval(syncMusic, 2000);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      clearInterval(poll);
+    };
+  }, [syncMusic]);
+
+  // Geolocation + Open-Meteo weather
+  useEffect(() => {
+    const cached = localStorage.getItem("home_weather_cache");
+    if (cached) {
+      try {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < 1800000) { setWeather(data); return; }
+      } catch { /* ignore */ }
+    }
+
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`)
+          .then((r) => r.json())
+          .then((json) => {
+            if (json.current_weather) {
+              const data: WeatherData = {
+                temperature: Math.round(json.current_weather.temperature),
+                weathercode: json.current_weather.weathercode,
+              };
+              setWeather(data);
+              try { localStorage.setItem("home_weather_cache", JSON.stringify({ data, ts: Date.now() })); } catch { /* ignore */ }
+            }
+          })
+          .catch(() => {});
+      },
+      () => {},
+      { timeout: 10000, maximumAge: 600000 }
+    );
   }, []);
 
   const hour = now.getHours();
@@ -92,29 +172,17 @@ export default function HomePage() {
     } catch { return []; }
   }, [now]);
 
-  const nowPlaying = useMemo((): NowPlaying | null => {
+  // Latest sticky note (read-only)
+  const latestNote = useMemo((): StickyNote | null => {
     try {
-      const data = localStorage.getItem("music_now_playing");
-      if (!data) return null;
-      return JSON.parse(data);
+      const all: StickyNote[] = JSON.parse(localStorage.getItem("sticky_notes") || "[]");
+      return all.length > 0 ? all[0] : null;
     } catch { return null; }
-  }, []);
+  }, [now]);
 
-  const saveNotes = (next: Note[]) => {
-    setNotes(next);
-    try { localStorage.setItem("home_notes", JSON.stringify(next)); } catch {}
-  };
+  const noteColor = latestNote ? (NOTE_COLORS[latestNote.color] || NOTE_COLORS.yellow) : null;
 
-  const addNote = () => {
-    const text = noteInput.trim();
-    if (!text) return;
-    saveNotes([{ id: crypto.randomUUID(), text, createdAt: Date.now() }, ...notes]);
-    setNoteInput("");
-  };
-
-  const deleteNote = (id: string) => {
-    saveNotes(notes.filter((n) => n.id !== id));
-  };
+  const wIcon = weather ? weatherIcon(weather.weathercode) : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -124,13 +192,53 @@ export default function HomePage() {
           <div className="flex items-center justify-between pt-6 mb-1">
             <p className="text-[13px] text-[var(--color-text-secondary)]">{dateStr}</p>
             <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-              <span className="text-[13px]">--°</span>
+              {wIcon === "sun" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              )}
+              {wIcon === "cloud" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                </svg>
+              )}
+              {wIcon === "rain" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="16" y1="13" x2="16" y2="21" /><line x1="8" y1="13" x2="8" y2="21" /><line x1="12" y1="15" x2="12" y2="23" />
+                  <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+                </svg>
+              )}
+              {wIcon === "snow" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
+                  <line x1="8" y1="16" x2="8.01" y2="16" /><line x1="8" y1="20" x2="8.01" y2="20" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" /><line x1="12" y1="22" x2="12.01" y2="22" />
+                  <line x1="16" y1="16" x2="16.01" y2="16" /><line x1="16" y1="20" x2="16.01" y2="20" />
+                </svg>
+              )}
+              {wIcon === "fog" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" opacity="0.5" />
+                </svg>
+              )}
+              {wIcon === "storm" && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9" />
+                  <polyline points="13 11 9 17 15 17 11 23" />
+                </svg>
+              )}
+              {!wIcon && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              )}
+              <span className="text-[13px]">{weather ? `${weather.temperature}°` : "--°"}</span>
             </div>
           </div>
 
@@ -140,69 +248,46 @@ export default function HomePage() {
           </h1>
           <p className="text-[13px] text-[var(--color-text-secondary)] mb-8">{timeStr}</p>
 
-          {/* Notes section */}
+          {/* Latest sticky note (read-only) */}
           <section className="mb-8">
-            <div className="flex items-center gap-2 mb-3">
+            <button onClick={() => navigate("/notes")} className="flex items-center gap-2 mb-3 group">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                <path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3z" /><polyline points="14 3 14 8 21 8" />
               </svg>
               <span className="text-[14px] font-semibold">Notes</span>
-              {notes.length > 0 && (
-                <span className="text-[11px] text-[var(--color-text-secondary)] bg-black/[0.05] px-1.5 py-0.5 rounded-full">{notes.length}</span>
-              )}
-            </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-0 group-hover:opacity-30 transition-opacity ml-auto">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
 
-            {/* Note input */}
-            <div className="flex gap-2 mb-3">
-              <input
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addNote()}
-                placeholder="写点什么..."
-                className="flex-1 px-3.5 py-2.5 text-[13px] rounded-xl border border-[var(--color-border)] bg-transparent outline-none focus:border-[var(--color-accent)] transition-colors"
-              />
+            {latestNote && noteColor ? (
               <button
-                onClick={addNote}
-                className="px-3 rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity shrink-0"
+                onClick={() => navigate("/notes")}
+                className="w-full text-left rounded-xl px-4 pt-4 pb-3 transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                style={{
+                  background: noteColor.bg,
+                  borderTop: `3px solid ${noteColor.border}`,
+                  boxShadow: "1px 2px 6px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03)",
+                  transform: "rotate(-0.5deg)",
+                }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                <p
+                  className="text-[13px] leading-relaxed whitespace-pre-wrap"
+                  style={{ color: noteColor.text, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                >
+                  {latestNote.text}
+                </p>
+                <p className="text-[10px] mt-2 opacity-50" style={{ color: noteColor.text }}>
+                  {new Date(latestNote.updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
               </button>
-            </div>
-
-            {/* Note cards */}
-            {notes.length === 0 ? (
-              <div className="px-4 py-6 rounded-2xl border border-[var(--color-border)] text-center">
-                <p className="text-[12px] text-[var(--color-text-secondary)]">还没有备忘</p>
-              </div>
             ) : (
-              <div className="space-y-2">
-                {notes.slice(0, 5).map((note) => (
-                  <div
-                    key={note.id}
-                    className="group flex items-start gap-3 px-4 py-3 rounded-2xl border border-[var(--color-border)] bg-black/[0.02]"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5 opacity-60">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] leading-relaxed">{note.text}</p>
-                      <p className="text-[11px] text-[var(--color-text-secondary)] mt-1">
-                        {new Date(note.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => deleteNote(note.id)}
-                      className="p-1 rounded-lg opacity-0 group-hover:opacity-40 hover:!opacity-80 transition-opacity shrink-0"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <button
+                onClick={() => navigate("/notes")}
+                className="w-full px-4 py-6 rounded-2xl border border-[var(--color-border)] text-center hover:bg-black/[0.02] transition-colors"
+              >
+                <p className="text-[12px] text-[var(--color-text-secondary)]">还没有便笺</p>
+              </button>
             )}
           </section>
 

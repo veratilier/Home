@@ -6,6 +6,7 @@ import HomePage from "./pages/HomePage";
 import ChatPage from "./pages/ChatPage";
 import MusicPage from "./pages/MusicPage";
 import DiaryPage from "./pages/DiaryPage";
+import NotesPage from "./pages/NotesPage";
 import AnniversaryPage from "./pages/AnniversaryPage";
 import SettingsPage from "./pages/SettingsPage";
 import DesktopPet from "./components/DesktopPet";
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/music" element={<MusicPage />} />
             <Route path="/diary" element={<DiaryPage />} />
+            <Route path="/notes" element={<NotesPage />} />
             <Route path="/anniversary" element={<AnniversaryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

@@ -4,6 +4,7 @@ import {
   ChatIcon,
   MusicIcon,
   DiaryIcon,
+  NoteIcon,
   AnniversaryIcon,
   SettingsIcon,
   CloseIcon,
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/chat", icon: ChatIcon, label: "聊天" },
   { to: "/music", icon: MusicIcon, label: "音乐" },
   { to: "/diary", icon: DiaryIcon, label: "日记" },
+  { to: "/notes", icon: NoteIcon, label: "便笺" },
   { to: "/anniversary", icon: AnniversaryIcon, label: "纪念日" },
 ] as const;
 
