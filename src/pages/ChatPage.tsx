@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-
+import { useAgent, parseActions } from "../context/AgentContext";
 
 interface Attachment {
   id: string;
@@ -64,15 +64,15 @@ const CHANNEL_MODELS: Record<Channel, { value: string; label: string }[]> = {
 };
 
 const mockThinkingTexts = [
-  "用户在询问今天的天气情况。我需要给出一个合理的天气描述，包括温度、风力和天气状况。考虑到这是一个日常对话场景，我应该用自然亲切的语气回答。",
-  "用户想要一首适合下午听的音乐推荐。下午的时光通常比较悠闲，适合轻柔、舒缓、有氛围感的音乐。Yiruma 的 River Flows in You 是一个很好的选择。",
-  "这是一个创作类请求，用户希望我写一段关于秋天的短诗。我需要构思秋天的意象：落叶、微风、金色光线、桂花香。",
+  "The user is asking about today's weather. I'll check the conditions and give a friendly, natural response including temperature and wind.",
+  "The user wants a music recommendation for the afternoon. I'll suggest something calm and atmospheric, and create a note to remember it.",
+  "This is a creative request — the user wants a short poem about autumn. I'll craft imagery with falling leaves, golden light, and sweet osmanthus.",
 ];
 
 const mockReplies = [
-  "今天天气晴朗，气温大约 26°C，微风轻拂，非常适合出门走走。傍晚可能会有些许云层，但不影响整体的好天气。记得带上防晒哦。",
-  "推荐你听 Yiruma 的《River Flows in You》，钢琴旋律如流水般轻柔，特别适合午后安静的时光。如果你喜欢更有氛围感的音乐，坂本龍一的《Merry Christmas Mr. Lawrence》也是不错的选择。",
-  "秋风起，叶知归。\n一抹斜阳穿林过，\n金黄铺满旧时径。\n雁声远去天际尽，\n唯余桂香入梦轻。",
+  "Today is sunny with about 26°C, a light breeze — perfect for a walk. There might be some clouds by evening, but overall it's lovely weather. Don't forget sunscreen!",
+  "I'd recommend Yiruma's \"River Flows in You\" — the piano melody is gentle like flowing water, perfect for a quiet afternoon. If you prefer something more atmospheric, Ryuichi Sakamoto's \"Merry Christmas Mr. Lawrence\" is also a great choice.\n\n```vesper-action\n{\"type\": \"create_note\", \"text\": \"Music rec: River Flows in You - Yiruma\", \"color\": \"blue\"}\n```",
+  "Autumn winds rise, leaves know to return.\nA slant of sun through the forest,\ngolden paths of seasons past.\nGeese vanish at the horizon,\nonly osmanthus lingers in dreams.",
 ];
 
 function formatNow() {
@@ -326,6 +326,7 @@ function ModelPicker({ models, current, onChange, open, onClose, anchorRef }: {
 /* ── Main component ── */
 
 export default function ChatPage() {
+  const { executeActions } = useAgent();
   const [channel, setChannel] = useState<Channel>("claude");
   const [sessionsByChannel, setSessionsByChannel] = useState<Record<Channel, ChatSession[]>>(() => ({
     claude: loadSessions("claude"),
@@ -497,6 +498,9 @@ export default function ChatPage() {
       setSessionsByChannel((prev) => ({ ...prev, [channel]: updater(prev[channel]) }));
     };
 
+    const rawReply = mockReplies[idx];
+    const { clean, actions } = parseActions(rawReply);
+
     setTimeout(() => {
       addMsg((prev) => prev.map((s) => s.id === sessionId ? { ...s, messages: [...s.messages, { id: thinkingId, role: "assistant" as const, content: "", isThinking: true, time: formatNow() }] } : s));
     }, 300);
@@ -506,7 +510,10 @@ export default function ChatPage() {
     }, 1200);
 
     setTimeout(() => {
-      addMsg((prev) => prev.map((s) => s.id === sessionId ? { ...s, messages: s.messages.map((m) => m.id === thinkingId ? { ...m, content: mockReplies[idx], isThinkingStreaming: false, isStreaming: true, time: formatNow() } : m) } : s));
+      addMsg((prev) => prev.map((s) => s.id === sessionId ? { ...s, messages: s.messages.map((m) => m.id === thinkingId ? { ...m, content: clean, isThinkingStreaming: false, isStreaming: true, time: formatNow() } : m) } : s));
+      if (actions.length > 0) {
+        setTimeout(() => executeActions(actions), 1500);
+      }
     }, 3200);
   };
 
