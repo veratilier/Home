@@ -27,6 +27,12 @@ function formatTime(s: number) {
   return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
+function formatListenTime(totalSec: number) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  return `${h} 小时 ${m} 分钟`;
+}
+
 function generateCoverGradient(id: string) {
   const hues: Record<string, [number, number]> = {
     "1": [220, 260], "2": [180, 220], "3": [270, 310],
@@ -112,6 +118,13 @@ export default function MusicPage() {
     catch { return new Set(); }
   });
   const [coverColors, setCoverColors] = useState<[number, number, number, number, number, number] | null>(null);
+  const [listenSeconds, setListenSeconds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("music_listen_seconds") || "0"); }
+    catch { return 0; }
+  });
+  const [mcpSettingsOpen, setMcpSettingsOpen] = useState(false);
+  const [mcpUrl, setMcpUrl] = useState(() => localStorage.getItem("music_mcp_url") || "");
+  const [mcpCookie, setMcpCookie] = useState(() => localStorage.getItem("music_mcp_cookie") || "");
   const progressRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -171,6 +184,28 @@ export default function MusicPage() {
     progressRef.current = 0;
     setProgress(0);
   }, [currentIndex]);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => {
+      setListenSeconds((prev: number) => {
+        const next = prev + 1;
+        try { localStorage.setItem("music_listen_seconds", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isPlaying]);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    try {
+      localStorage.setItem("music_now_playing", JSON.stringify({
+        title: current.title, artist: current.artist, cover: current.cover, isPlaying,
+      }));
+    } catch {}
+  }, [current.title, current.artist, current.cover, isPlaying]);
 
   const togglePlay = () => setIsPlaying((p) => !p);
   const prev = () => { setCurrentIndex((i) => (i - 1 + playlist.length) % playlist.length); };
@@ -232,7 +267,7 @@ export default function MusicPage() {
             </svg>
           </div>
         </div>
-        <p className="text-[11px] text-white/40 mt-2">一起听了 671 小时 48 分钟</p>
+        <p className="text-[11px] text-white/40 mt-2">一起听了 {formatListenTime(listenSeconds)}</p>
       </div>
 
       {/* Album art disc */}
@@ -380,12 +415,15 @@ export default function MusicPage() {
 
       {/* Bottom indicator */}
       <div className="shrink-0 flex justify-center pb-4">
-        <div className="flex items-center gap-1 px-4 py-1.5 rounded-full bg-white/8">
+        <button onClick={() => setMcpSettingsOpen(true)} className="flex items-center gap-1 px-4 py-1.5 rounded-full bg-white/8 hover:bg-white/15 transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
           </svg>
           <span className="text-[11px] text-white/50 ml-1">网易云音乐 · MCP</span>
-        </div>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="ml-0.5 opacity-40">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
       </div>
 
       {/* Playlist drawer */}
@@ -465,20 +503,19 @@ export default function MusicPage() {
                     <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
                   </svg>
                   <p className="text-[12px] text-white/30">接入 netease-music-mcp 后可搜索</p>
-                  <p className="text-[11px] text-white/20 mt-1">通过聊天页面调用 🔍 搜歌 工具</p>
+                  <p className="text-[11px] text-white/20 mt-1">通过聊天页面调用搜歌工具</p>
                 </div>
               ) : (
                 <div>
                   <p className="text-[12px] text-white/40 mb-3">推荐功能</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { icon: "✨", label: "每日推荐", desc: "30首个性化推荐" },
-                      { icon: "📻", label: "私人FM", desc: "算法猜你喜欢" },
-                      { icon: "❤️", label: "红心列表", desc: "收藏的歌曲" },
-                      { icon: "📊", label: "听歌排行", desc: "最常听的歌" },
+                      { label: "每日推荐", desc: "30首个性化推荐" },
+                      { label: "私人FM", desc: "算法猜你喜欢" },
+                      { label: "红心列表", desc: "收藏的歌曲" },
+                      { label: "听歌排行", desc: "最常听的歌" },
                     ].map((item) => (
                       <button key={item.label} className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left">
-                        <span className="text-lg">{item.icon}</span>
                         <div>
                           <p className="text-[12px] text-white/80 font-medium">{item.label}</p>
                           <p className="text-[10px] text-white/30">{item.desc}</p>
@@ -489,6 +526,104 @@ export default function MusicPage() {
                   <p className="text-[11px] text-white/20 text-center mt-4">需接入 netease-music-mcp 服务</p>
                 </div>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MCP settings drawer */}
+      {mcpSettingsOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setMcpSettingsOpen(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-[hsl(0,0%,12%)] rounded-t-2xl shadow-2xl animate-[slideUp_0.3s_ease-out]" style={{ maxHeight: "65vh" }}>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/15" />
+            </div>
+            <div className="flex items-center justify-between px-5 pb-3">
+              <h3 className="text-[15px] font-semibold text-white/90">MCP 设置</h3>
+              <button onClick={() => setMcpSettingsOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 pb-8 overflow-y-auto" style={{ maxHeight: "calc(65vh - 60px)" }}>
+              {/* Connection status */}
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 mb-4">
+                <div className={`w-2.5 h-2.5 rounded-full ${mcpUrl ? "bg-emerald-400" : "bg-white/20"}`} />
+                <div className="flex-1">
+                  <p className="text-[13px] text-white/80 font-medium">netease-music-mcp</p>
+                  <p className="text-[11px] text-white/35">{mcpUrl ? "已连接" : "未连接"}</p>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
+                  <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                </svg>
+              </div>
+
+              {/* Stats */}
+              <div className="flex gap-3 mb-5">
+                <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-center">
+                  <p className="text-[18px] font-bold text-white/80 tabular-nums">{Math.floor(listenSeconds / 3600)}</p>
+                  <p className="text-[10px] text-white/35 mt-0.5">小时</p>
+                </div>
+                <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-center">
+                  <p className="text-[18px] font-bold text-white/80 tabular-nums">{Math.floor((listenSeconds % 3600) / 60)}</p>
+                  <p className="text-[10px] text-white/35 mt-0.5">分钟</p>
+                </div>
+                <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-center">
+                  <p className="text-[18px] font-bold text-white/80 tabular-nums">{playlist.length}</p>
+                  <p className="text-[10px] text-white/35 mt-0.5">歌曲</p>
+                </div>
+              </div>
+
+              {/* Server URL */}
+              <div className="mb-4">
+                <label className="text-[11px] text-white/40 mb-1.5 block">服务器地址</label>
+                <input
+                  value={mcpUrl}
+                  onChange={(e) => {
+                    setMcpUrl(e.target.value);
+                    try { localStorage.setItem("music_mcp_url", e.target.value); } catch {}
+                  }}
+                  placeholder="http://localhost:3000"
+                  className="w-full px-3 py-2.5 text-[13px] text-white/80 rounded-xl bg-white/8 border border-white/10 outline-none focus:border-white/25 transition-colors placeholder:text-white/20"
+                />
+              </div>
+
+              {/* Cookie */}
+              <div className="mb-5">
+                <label className="text-[11px] text-white/40 mb-1.5 block">Cookie / 登录凭证</label>
+                <textarea
+                  value={mcpCookie}
+                  onChange={(e) => {
+                    setMcpCookie(e.target.value);
+                    try { localStorage.setItem("music_mcp_cookie", e.target.value); } catch {}
+                  }}
+                  placeholder="MUSIC_U=..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 text-[13px] text-white/80 rounded-xl bg-white/8 border border-white/10 outline-none focus:border-white/25 transition-colors placeholder:text-white/20 resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <button
+                onClick={() => setMcpSettingsOpen(false)}
+                className="w-full py-2.5 text-[13px] font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+              >
+                保存
+              </button>
+
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => {
+                    setListenSeconds(0);
+                    try { localStorage.setItem("music_listen_seconds", "0"); } catch {}
+                  }}
+                  className="text-[12px] text-white/30 hover:text-white/50 transition-colors"
+                >
+                  重置播放时长
+                </button>
+              </div>
             </div>
           </div>
         </>
