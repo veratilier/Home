@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface DiaryEntry {
   id: string;
@@ -7,10 +7,24 @@ interface DiaryEntry {
   author: "user" | "assistant";
 }
 
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+interface Reminder {
+  id: string;
+  title: string;
+  note: string;
+  date: string;
+  time: string;
+  done: boolean;
+  priority: "low" | "medium" | "high";
+}
+
+const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY_FULL = [
+  "Sunday", "Monday", "Tuesday", "Wednesday",
+  "Thursday", "Friday", "Saturday",
+];
 const MONTH_NAMES = [
-  "1月", "2月", "3月", "4月", "5月", "6月",
-  "7月", "8月", "9月", "10月", "11月", "12月",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 function dateKey(y: number, m: number, d: number) {
@@ -22,9 +36,33 @@ function todayKey() {
   return dateKey(t.getFullYear(), t.getMonth(), t.getDate());
 }
 
+function getCalendarDays(year: number, month: number) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevDays = new Date(year, month, 0).getDate();
+  const days: { day: number; current: boolean; key: string }[] = [];
+
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevDays - i;
+    const pm = month === 0 ? 11 : month - 1;
+    const py = month === 0 ? year - 1 : year;
+    days.push({ day: d, current: false, key: dateKey(py, pm, d) });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push({ day: d, current: true, key: dateKey(year, month, d) });
+  }
+  const remaining = 42 - days.length;
+  for (let d = 1; d <= remaining; d++) {
+    const nm = month === 11 ? 0 : month + 1;
+    const ny = month === 11 ? year + 1 : year;
+    days.push({ day: d, current: false, key: dateKey(ny, nm, d) });
+  }
+  return days;
+}
+
 function ChevronLeft() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="15 18 9 12 15 6" />
     </svg>
   );
@@ -32,71 +70,33 @@ function ChevronLeft() {
 
 function ChevronRight() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="9 18 15 12 9 6" />
     </svg>
   );
-}
-
-function SparkleIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-    </svg>
-  );
-}
-
-function PenIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
-    </svg>
-  );
-}
-
-function getCalendarDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const prevDays = new Date(year, month, 0).getDate();
-
-  const days: { day: number; current: boolean; key: string }[] = [];
-
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = prevDays - i;
-    const m = month === 0 ? 11 : month - 1;
-    const y = month === 0 ? year - 1 : year;
-    days.push({ day: d, current: false, key: dateKey(y, m, d) });
-  }
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    days.push({ day: d, current: true, key: dateKey(year, month, d) });
-  }
-
-  const remaining = 42 - days.length;
-  for (let d = 1; d <= remaining; d++) {
-    const m = month === 11 ? 0 : month + 1;
-    const y = month === 11 ? year + 1 : year;
-    days.push({ day: d, current: false, key: dateKey(y, m, d) });
-  }
-
-  return days;
-}
-
-function formatDisplayDate(key: string) {
-  const [y, m, d] = key.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const weekday = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][date.getDay()];
-  return `${y}年${m}月${d}日 ${weekday}`;
 }
 
 export default function DiaryPage() {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [activeTab, setActiveTab] = useState<"user" | "assistant">("user");
+  const [newTodo, setNewTodo] = useState("");
+  const [isWriting, setIsWriting] = useState(false);
+
   const [entries, setEntries] = useState<DiaryEntry[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("diary_v2") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const [reminders, setReminders] = useState<Reminder[]>(() => {
+    try {
+      const stored = localStorage.getItem("reminders_v1");
+      return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
@@ -107,102 +107,202 @@ export default function DiaryPage() {
   const entryMap = useMemo(() => {
     const map: Record<string, DiaryEntry[]> = {};
     for (const e of entries) {
+      if (!e.content) continue;
       if (!map[e.date]) map[e.date] = [];
       map[e.date].push(e);
     }
     return map;
   }, [entries]);
 
-  const calDays = useMemo(() => getCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
+  const calDays = useMemo(
+    () => getCalendarDays(viewYear, viewMonth),
+    [viewYear, viewMonth],
+  );
 
-  const save = (next: DiaryEntry[]) => {
+  const dateTodos = useMemo(
+    () => reminders.filter((r) => r.date === selectedDate),
+    [reminders, selectedDate],
+  );
+  const activeTodoCount = dateTodos.filter((r) => !r.done).length;
+  const currentEntry = entries.find(
+    (e) => e.date === selectedDate && e.author === activeTab,
+  );
+
+  useEffect(() => {
+    setIsWriting(false);
+  }, [selectedDate, activeTab]);
+
+  const [selY, selM, selD] = selectedDate.split("-").map(Number);
+  const selDateObj = new Date(selY, selM - 1, selD);
+  const dateDisplay = `${WEEKDAY_FULL[selDateObj.getDay()]}, ${MONTH_NAMES[selM - 1]} ${selD}`;
+  const isToday = selectedDate === today;
+
+  const saveDiary = (next: DiaryEntry[]) => {
     setEntries(next);
-    try { localStorage.setItem("diary_v2", JSON.stringify(next)); } catch {}
+    try {
+      localStorage.setItem("diary_v2", JSON.stringify(next));
+    } catch {}
+  };
+
+  const saveReminders = (next: Reminder[]) => {
+    setReminders(next);
+    try {
+      localStorage.setItem("reminders_v1", JSON.stringify(next));
+    } catch {}
   };
 
   const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(viewYear - 1); }
-    else setViewMonth(viewMonth - 1);
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(viewYear - 1);
+    } else setViewMonth(viewMonth - 1);
   };
 
   const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(viewYear + 1); }
-    else setViewMonth(viewMonth + 1);
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(viewYear + 1);
+    } else setViewMonth(viewMonth + 1);
   };
 
   const goToday = () => {
     setViewYear(now.getFullYear());
     setViewMonth(now.getMonth());
+    setSelectedDate(todayKey());
   };
 
-  const selectedEntries = selectedDate ? (entryMap[selectedDate] || []) : [];
-  const userEntry = selectedEntries.find((e) => e.author === "user");
-  const assistantEntries = selectedEntries.filter((e) => e.author === "assistant");
-
-  const updateUserEntry = (content: string) => {
-    if (!selectedDate) return;
-    if (userEntry) {
-      save(entries.map((e) => (e.id === userEntry.id ? { ...e, content } : e)));
-    } else {
-      const newEntry: DiaryEntry = {
+  const addTodo = () => {
+    if (!newTodo.trim()) return;
+    saveReminders([
+      ...reminders,
+      {
         id: crypto.randomUUID(),
+        title: newTodo.trim(),
+        note: "",
         date: selectedDate,
-        content,
-        author: "user",
-      };
-      save([...entries, newEntry]);
-    }
+        time: "",
+        done: false,
+        priority: "medium",
+      },
+    ]);
+    setNewTodo("");
   };
 
-  const deleteUserEntry = () => {
-    if (!userEntry) return;
-    save(entries.filter((e) => e.id !== userEntry.id));
+  const toggleTodo = (id: string) => {
+    saveReminders(
+      reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)),
+    );
+  };
+
+  const removeTodo = (id: string) => {
+    saveReminders(reminders.filter((r) => r.id !== id));
+  };
+
+  const updateDiary = (content: string) => {
+    if (currentEntry) {
+      saveDiary(
+        entries.map((e) =>
+          e.id === currentEntry.id ? { ...e, content } : e,
+        ),
+      );
+    } else if (content) {
+      saveDiary([
+        ...entries,
+        {
+          id: crypto.randomUUID(),
+          date: selectedDate,
+          content,
+          author: activeTab,
+        },
+      ]);
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Calendar header */}
-      <div className="shrink-0 px-5 pt-5 pb-2">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold tracking-tight">
-            {viewYear}年{MONTH_NAMES[viewMonth]}
-          </h1>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={goToday}
-              className="px-3 py-1 text-xs font-medium rounded-lg border border-[var(--color-border)] hover:bg-black/[0.03] transition-colors mr-1"
-            >
-              今天
-            </button>
-            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-black/[0.05] transition-colors">
-              <ChevronLeft />
-            </button>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-black/[0.05] transition-colors">
-              <ChevronRight />
-            </button>
-          </div>
+      {/* Header */}
+      <div className="shrink-0 px-5 pt-5 pb-1">
+        <h1 className="text-xl font-bold tracking-tight mb-3">Diary</h1>
+
+        {/* Tab switcher */}
+        <div className="flex bg-black/[0.05] rounded-xl p-1 mb-3">
+          <button
+            onClick={() => setActiveTab("user")}
+            className={`flex-1 py-2 text-[13px] font-medium rounded-lg transition-all ${
+              activeTab === "user"
+                ? "bg-white text-[var(--color-text-primary)] shadow-sm"
+                : "text-[var(--color-text-secondary)]"
+            }`}
+          >
+            Vera
+          </button>
+          <button
+            onClick={() => setActiveTab("assistant")}
+            className={`flex-1 py-2 text-[13px] font-medium rounded-lg transition-all ${
+              activeTab === "assistant"
+                ? "bg-white text-[var(--color-text-primary)] shadow-sm"
+                : "text-[var(--color-text-secondary)]"
+            }`}
+          >
+            Rowan
+          </button>
+        </div>
+
+        {/* Date display */}
+        <p className="text-[13px] text-[var(--color-text-secondary)] mb-2">
+          {dateDisplay}
+        </p>
+
+        {/* Month navigation */}
+        <div className="flex items-center justify-between mb-1">
+          <button
+            onClick={prevMonth}
+            className="p-1 rounded-lg hover:bg-black/[0.05] transition-colors"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            onClick={goToday}
+            className="text-[13px] font-semibold hover:text-[var(--color-accent)] transition-colors"
+          >
+            {MONTH_NAMES[viewMonth]} {viewYear}
+          </button>
+          <button
+            onClick={nextMonth}
+            className="p-1 rounded-lg hover:bg-black/[0.05] transition-colors"
+          >
+            <ChevronRight />
+          </button>
         </div>
 
         {/* Weekday headers */}
-        <div className="grid grid-cols-7 mb-1">
+        <div className="grid grid-cols-7">
           {WEEKDAYS.map((w, i) => (
-            <div key={w} className={`text-center text-[11px] font-medium py-1 ${i === 0 || i === 6 ? "text-[var(--color-accent)]" : "text-[var(--color-text-secondary)]"}`}>
+            <div
+              key={w}
+              className={`text-center text-[11px] font-medium py-1 ${
+                i === 0 || i === 6
+                  ? "text-[var(--color-accent)]"
+                  : "text-[var(--color-text-secondary)]"
+              }`}
+            >
               {w}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Calendar grid */}
-      <div className="flex-1 px-5 pb-4 overflow-y-auto">
-        <div className="grid grid-cols-7 gap-px">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-5 pb-6">
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-px mb-4">
           {calDays.map((cell, i) => {
-            const isToday = cell.key === today;
-            const hasEntries = !!entryMap[cell.key];
-            const hasUser = entryMap[cell.key]?.some((e) => e.author === "user");
-            const hasAssistant = entryMap[cell.key]?.some((e) => e.author === "assistant");
+            const isTodayCell = cell.key === today;
             const isSelected = cell.key === selectedDate;
-            const isWeekend = i % 7 === 0 || i % 7 === 6;
+            const hasEntry = !!entryMap[cell.key];
+            const hasTodo = reminders.some(
+              (r) => r.date === cell.key && !r.done,
+            );
 
             return (
               <button
@@ -212,22 +312,28 @@ export default function DiaryPage() {
                   relative flex flex-col items-center py-2 rounded-xl transition-all duration-150
                   ${cell.current ? "" : "opacity-30"}
                   ${isSelected ? "bg-[var(--color-accent)] text-white shadow-sm" : "hover:bg-black/[0.04]"}
-                  ${!isSelected && isToday ? "ring-1.5 ring-[var(--color-accent)]" : ""}
+                  ${!isSelected && isTodayCell ? "ring-1.5 ring-[var(--color-accent)]" : ""}
                 `}
               >
-                <span className={`
+                <span
+                  className={`
                   text-[13px] font-medium leading-none
-                  ${isSelected ? "text-white" : isToday ? "text-[var(--color-accent)] font-bold" : isWeekend && cell.current ? "text-[var(--color-accent)]/70" : ""}
-                `}>
+                  ${isSelected ? "text-white" : isTodayCell ? "text-[var(--color-accent)] font-bold" : ""}
+                `}
+                >
                   {cell.day}
                 </span>
-                {hasEntries && (
+                {(hasEntry || hasTodo) && (
                   <div className="flex gap-[3px] mt-1.5">
-                    {hasUser && (
-                      <span className={`w-[5px] h-[5px] rounded-full ${isSelected ? "bg-white/80" : "bg-[var(--color-accent)]"}`} />
+                    {hasEntry && (
+                      <span
+                        className={`w-[4px] h-[4px] rounded-full ${isSelected ? "bg-white/80" : "bg-[var(--color-accent)]"}`}
+                      />
                     )}
-                    {hasAssistant && (
-                      <span className={`w-[5px] h-[5px] rounded-full ${isSelected ? "bg-white/60" : "bg-[var(--color-text-secondary)]/50"}`} />
+                    {hasTodo && (
+                      <span
+                        className={`w-[4px] h-[4px] rounded-full ${isSelected ? "bg-white/60" : "bg-blue-400"}`}
+                      />
                     )}
                   </div>
                 )}
@@ -236,114 +342,157 @@ export default function DiaryPage() {
           })}
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-4 px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-[6px] h-[6px] rounded-full bg-[var(--color-accent)]" />
-            <span className="text-[11px] text-[var(--color-text-secondary)]">我的日记</span>
+        {/* Divider */}
+        <div className="border-b border-[var(--color-border)] mb-4" />
+
+        {/* Today's To Do */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2.5">
+            <h2 className="text-[14px] font-semibold">Today's To Do</h2>
+            <span className="text-[12px] text-[var(--color-text-secondary)]">
+              {activeTodoCount} left ›
+            </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-[6px] h-[6px] rounded-full bg-[var(--color-text-secondary)]/50" />
-            <span className="text-[11px] text-[var(--color-text-secondary)]">AI 日记</span>
+
+          {dateTodos.length === 0 ? (
+            <p className="text-[13px] text-[var(--color-text-secondary)]/60 py-3 text-center">
+              这一天还没有待办。
+            </p>
+          ) : (
+            <div className="space-y-0.5 mb-2">
+              {dateTodos.map((todo) => (
+                <div key={todo.id} className="flex items-center gap-3 py-2 group">
+                  <button
+                    onClick={() => toggleTodo(todo.id)}
+                    className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center shrink-0 transition-all ${
+                      todo.done
+                        ? "bg-[var(--color-accent)] border-[var(--color-accent)]"
+                        : "border-[var(--color-border)] hover:border-[var(--color-accent)]"
+                    }`}
+                  >
+                    {todo.done && (
+                      <svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                  <span
+                    className={`flex-1 text-[13px] ${todo.done ? "line-through text-[var(--color-text-secondary)]" : ""}`}
+                  >
+                    {todo.title}
+                  </span>
+                  <button
+                    onClick={() => removeTodo(todo.id)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/[0.05] transition-all"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-text-secondary)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Inline add input */}
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              value={newTodo}
+              onChange={(e) => setNewTodo(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addTodo()}
+              placeholder={`添加 ${selM} 月 ${selD} 日的待办...`}
+              className="flex-1 px-3 py-2 text-[13px] rounded-xl border border-[var(--color-border)] outline-none focus:border-[var(--color-accent)] transition-colors bg-transparent"
+            />
+            <button
+              onClick={addTodo}
+              className="w-8 h-8 rounded-xl bg-[var(--color-accent)] text-white flex items-center justify-center hover:opacity-90 transition-opacity shrink-0"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Diary detail drawer */}
-      {selectedDate && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-50" onClick={() => setSelectedDate(null)} />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl animate-[slideUp_0.3s_ease-out]"
-            style={{ maxHeight: "70vh" }}
-          >
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-black/15" />
-            </div>
+        {/* Divider */}
+        <div className="border-b border-[var(--color-border)] mb-4" />
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pb-3">
+        {/* Diary section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[14px] font-semibold">
+              {dateDisplay}
+              {isToday && (
+                <span className="ml-1.5 text-[12px] text-[var(--color-accent)] font-normal">
+                  今天
+                </span>
+              )}
+            </h2>
+            {activeTab === "user" && !isWriting && !currentEntry?.content && (
               <button
-                onClick={() => setSelectedDate(null)}
-                className="p-1 rounded-lg hover:bg-black/[0.05] transition-colors"
+                onClick={() => setIsWriting(true)}
+                className="text-[13px] text-[var(--color-accent)] font-medium hover:opacity-80 transition-opacity"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                写日记
               </button>
-              <h3 className="text-[14px] font-semibold">{formatDisplayDate(selectedDate)}</h3>
-              <div className="w-[30px]" />
-            </div>
-
-            {/* Content */}
-            <div className="px-5 pb-6 overflow-y-auto" style={{ maxHeight: "calc(70vh - 80px)" }}>
-              {/* Assistant entries (read-only) */}
-              {assistantEntries.length > 0 && (
-                <div className="mb-5">
-                  {assistantEntries.map((entry) => (
-                    <div key={entry.id} className="mb-3">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[#e8956e] flex items-center justify-center">
-                          <SparkleIcon size={9} />
-                        </div>
-                        <span className="text-[12px] font-medium text-[var(--color-text-secondary)]">AI 日记</span>
-                      </div>
-                      <div className="pl-[26px]">
-                        <p className="text-[14px] leading-[1.8] text-[var(--color-text-primary)] whitespace-pre-wrap">
-                          {entry.content}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="border-b border-[var(--color-border)] mt-4 mb-4" />
-                </div>
-              )}
-
-              {/* User entry (editable) */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-full bg-[var(--color-text-primary)] flex items-center justify-center">
-                      <PenIcon size={9} />
-                    </div>
-                    <span className="text-[12px] font-medium text-[var(--color-text-secondary)]">我的日记</span>
-                  </div>
-                  {userEntry && (
-                    <button
-                      onClick={deleteUserEntry}
-                      className="text-[11px] text-red-400 hover:text-red-500 transition-colors px-2 py-0.5 rounded-md hover:bg-red-50"
-                    >
-                      删除
-                    </button>
-                  )}
-                </div>
-                <div className="pl-[26px]">
-                  <textarea
-                    value={userEntry?.content || ""}
-                    onChange={(e) => updateUserEntry(e.target.value)}
-                    placeholder="写下今天的想法…"
-                    rows={5}
-                    className="w-full text-[14px] leading-[1.8] outline-none resize-none bg-transparent placeholder:text-[var(--color-text-secondary)]/40"
-                  />
-                </div>
-              </div>
-
-              {/* Empty state */}
-              {assistantEntries.length === 0 && !userEntry?.content && (
-                <div className="flex flex-col items-center py-6 text-[var(--color-text-secondary)]/60">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                  </svg>
-                  <p className="text-[12px]">这一天还没有日记</p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </>
-      )}
+
+          {activeTab === "user" ? (
+            isWriting || currentEntry?.content ? (
+              <textarea
+                value={currentEntry?.content || ""}
+                onChange={(e) => updateDiary(e.target.value)}
+                placeholder="写下今天的想法…"
+                rows={5}
+                autoFocus={isWriting && !currentEntry?.content}
+                className="w-full text-[14px] leading-[1.8] outline-none resize-none bg-transparent placeholder:text-[var(--color-text-secondary)]/40"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--color-text-secondary)]/60 py-3 text-center">
+                这一天还没有写日记。
+              </p>
+            )
+          ) : currentEntry?.content ? (
+            <p className="text-[14px] leading-[1.8] whitespace-pre-wrap">
+              {currentEntry.content}
+            </p>
+          ) : (
+            <p className="text-[13px] text-[var(--color-text-secondary)]/60 py-3 text-center">
+              这一天还没有日记。
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

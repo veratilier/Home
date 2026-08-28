@@ -5,7 +5,6 @@ import {
   MusicIcon,
   DiaryIcon,
   AnniversaryIcon,
-  ReminderIcon,
   SettingsIcon,
   CloseIcon,
   PlusIcon,
@@ -17,7 +16,6 @@ const navItems = [
   { to: "/music", icon: MusicIcon, label: "音乐" },
   { to: "/diary", icon: DiaryIcon, label: "日记" },
   { to: "/anniversary", icon: AnniversaryIcon, label: "纪念日" },
-  { to: "/reminder", icon: ReminderIcon, label: "提醒" },
 ] as const;
 
 interface SidebarProps {
