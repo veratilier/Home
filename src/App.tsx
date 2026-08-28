@@ -7,6 +7,7 @@ import ChatPage from "./pages/ChatPage";
 import MusicPage from "./pages/MusicPage";
 import DiaryPage from "./pages/DiaryPage";
 import AnniversaryPage from "./pages/AnniversaryPage";
+import ReminderPage from "./pages/ReminderPage";
 import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/music" element={<MusicPage />} />
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/anniversary" element={<AnniversaryPage />} />
+            <Route path="/reminder" element={<ReminderPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
