@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
+import { loadSettings } from "../pages/SettingsPage";
 
-const SCALE = 5;
+const DEFAULT_SCALE = 5;
 const W = 15;
 const H = 12;
 
@@ -55,12 +56,16 @@ function drawFrame(canvas: HTMLCanvasElement | null, state: PetState) {
 }
 
 export default function DesktopPet() {
+  const settings = loadSettings();
+  const scale = settings.petScale || DEFAULT_SCALE;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [petState, setPetState] = useState<PetState>("idle");
   const [jumping, setJumping] = useState(false);
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   const stateRef = useRef(petState);
   stateRef.current = petState;
+
+  if (!settings.petVisible) return null;
 
   useEffect(() => {
     drawFrame(canvasRef.current, petState);
@@ -124,8 +129,8 @@ export default function DesktopPet() {
           width={W}
           height={H}
           style={{
-            width: W * SCALE,
-            height: H * SCALE,
+            width: W * scale,
+            height: H * scale,
             imageRendering: "pixelated",
           }}
         />

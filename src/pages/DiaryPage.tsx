@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { loadSettings } from "./SettingsPage";
 
 interface DiaryEntry {
   id: string;
@@ -78,6 +79,7 @@ function ChevronRight() {
 
 export default function DiaryPage() {
   const now = new Date();
+  const settings = loadSettings();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [selectedDate, setSelectedDate] = useState(todayKey());
@@ -234,7 +236,7 @@ export default function DiaryPage() {
                 : "text-[var(--color-text-secondary)]"
             }`}
           >
-            Vera
+            {settings.userName}
           </button>
           <button
             onClick={() => setActiveTab("assistant")}
@@ -244,7 +246,7 @@ export default function DiaryPage() {
                 : "text-[var(--color-text-secondary)]"
             }`}
           >
-            Rowan
+            {settings.assistantName}
           </button>
         </div>
 
