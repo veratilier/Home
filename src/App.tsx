@@ -43,15 +43,13 @@ export default function App() {
         <DesktopPet />
 
         <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
-          <header className="flex items-center h-[56px] px-4 shrink-0 lg:hidden">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
-              aria-label="Open sidebar"
-            >
-              <MenuIcon size={20} />
-            </button>
-          </header>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="fixed top-3 left-3 z-20 p-2 rounded-xl bg-white/70 backdrop-blur-sm shadow-sm hover:bg-white/90 transition-colors lg:hidden"
+            aria-label="Open sidebar"
+          >
+            <MenuIcon size={20} />
+          </button>
 
           <main className="flex-1 overflow-y-auto">
             <Routes>

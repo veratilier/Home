@@ -132,6 +132,7 @@ export default function DesktopPet() {
 
     const handleMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
     const handleTouchMove = (e: TouchEvent) => {
+      if (!dragging.current) return;
       if (e.touches.length === 1) {
         e.preventDefault();
         onMove(e.touches[0].clientX, e.touches[0].clientY);
