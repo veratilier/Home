@@ -40,3 +40,20 @@ body {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+
+@keyframes petBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes petJump {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(-18px); }
+  70% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes heartFloat {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -28px) scale(1.3); }
+}

@@ -8,6 +8,7 @@ import MusicPage from "./pages/MusicPage";
 import DiaryPage from "./pages/DiaryPage";
 import AnniversaryPage from "./pages/AnniversaryPage";
 import SettingsPage from "./pages/SettingsPage";
+import DesktopPet from "./components/DesktopPet";
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <div className="flex h-full">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <DesktopPet />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center h-[56px] px-4 shrink-0 lg:hidden">
